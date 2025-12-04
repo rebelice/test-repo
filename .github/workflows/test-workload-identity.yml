@@ -25,9 +25,13 @@ jobs:
         id: exchange
         run: |
           # Exchange OIDC token for Bytebase access token
-          RESPONSE=$(curl -s -X POST "http://localhost:8080/v1/idp/workloadIdentityPools/github-actions/providers/github:exchangeToken" \
+          # API: POST /v1/auth:exchangeToken
+          # audience format: projects/{project}/locations/global/workloadIdentityPools/{pool}/providers/{provider}
+          AUDIENCE="projects/aowuaowu/locations/global/workloadIdentityPools/github-actions/providers/github"
+
+          RESPONSE=$(curl -s -X POST "http://localhost:8080/v1/auth:exchangeToken" \
             -H "Content-Type: application/json" \
-            -d "{\"token\": \"${{ steps.oidc.outputs.oidc_token }}\"}")
+            -d "{\"token\": \"${{ steps.oidc.outputs.oidc_token }}\", \"audience\": \"$AUDIENCE\"}")
 
           echo "Exchange response: $RESPONSE"
 
