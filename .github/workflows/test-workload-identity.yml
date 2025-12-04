@@ -38,9 +38,10 @@ jobs:
           ACCESS_TOKEN=$(echo $RESPONSE | jq -r '.accessToken')
           echo "access_token=$ACCESS_TOKEN" >> $GITHUB_OUTPUT
 
-      - name: Test Bytebase API
+      - name: Test Bytebase API - List Plans (GitOps Service Agent has bb.plans.get permission)
         run: |
           # Use the token to call Bytebase API
-          echo "Testing Bytebase API with access token..."
+          # GitOps Service Agent has permissions: bb.plans.create, bb.plans.get, bb.releases.check, etc.
+          echo "Testing Bytebase API - List Plans..."
           curl -s -H "Authorization: Bearer ${{ steps.exchange.outputs.access_token }}" \
-            "http://localhost:8080/v1/projects"
+            "http://localhost:8080/v1/projects/aowuaowu/plans"
