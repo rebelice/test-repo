@@ -1,11 +1,13 @@
 name: Test Workload Identity
 
 on:
+  push:
+    branches: [main]
   workflow_dispatch:  # Manual trigger
 
 jobs:
   test-oidc:
-    runs-on: self-hosted  # Use self-hosted runner
+    runs-on: self-hosted
 
     permissions:
       id-token: write   # Required for OIDC token
@@ -16,8 +18,9 @@ jobs:
         id: oidc
         run: |
           # Get GitHub OIDC token
+          # Note: audience can be empty for GitHub Actions
           TOKEN=$(curl -s -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
-            "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=https://github.com/${{ github.repository_owner }}" | jq -r '.value')
+            "$ACTIONS_ID_TOKEN_REQUEST_URL" | jq -r '.value')
           echo "oidc_token=$TOKEN" >> $GITHUB_OUTPUT
           echo "Got OIDC token (first 50 chars): ${TOKEN:0:50}..."
 
@@ -25,23 +28,27 @@ jobs:
         id: exchange
         run: |
           # Exchange OIDC token for Bytebase access token
-          # API: POST /v1/auth:exchangeToken
-          # audience format: projects/{project}/locations/global/workloadIdentityPools/{pool}/providers/{provider}
-          AUDIENCE="projects/aowuaowu/locations/global/workloadIdentityPools/github-actions/providers/github"
-
-          RESPONSE=$(curl -s -X POST "http://localhost:8080/v1/auth:exchangeToken" \
+          # API: POST /v1/auth/exchangeToken
+          RESPONSE=$(curl -s -X POST "http://localhost:8080/v1/auth/exchangeToken" \
             -H "Content-Type: application/json" \
-            -d "{\"token\": \"${{ steps.oidc.outputs.oidc_token }}\", \"audience\": \"$AUDIENCE\"}")
+            -d "{
+              \"email\": \"github-deploy@workload.bytebase.com\",
+              \"oidc_token\": \"${{ steps.oidc.outputs.oidc_token }}\"
+            }")
 
           echo "Exchange response: $RESPONSE"
 
           ACCESS_TOKEN=$(echo $RESPONSE | jq -r '.accessToken')
+          if [ "$ACCESS_TOKEN" == "null" ] || [ -z "$ACCESS_TOKEN" ]; then
+            echo "Failed to get access token"
+            exit 1
+          fi
           echo "access_token=$ACCESS_TOKEN" >> $GITHUB_OUTPUT
+          echo "Successfully obtained Bytebase access token!"
 
-      - name: Test Bytebase API - List Plans (GitOps Service Agent has bb.plans.get permission)
+      - name: Test Bytebase API
         run: |
           # Use the token to call Bytebase API
-          # GitOps Service Agent has permissions: bb.plans.create, bb.plans.get, bb.releases.check, etc.
-          echo "Testing Bytebase API - List Plans..."
+          echo "Testing Bytebase API - Get current user..."
           curl -s -H "Authorization: Bearer ${{ steps.exchange.outputs.access_token }}" \
-            "http://localhost:8080/v1/projects/aowuaowu/plans"
+            "http://localhost:8080/v1/users/me"
