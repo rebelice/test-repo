@@ -59,6 +59,10 @@ jobs:
           echo "$SCHEMA_CONTENT"
           echo ""
 
+          # Encode statement as base64 (proto bytes field requires base64)
+          STATEMENT_BASE64=$(echo -n "$SCHEMA_CONTENT" | base64 -w 0)
+          echo "Statement base64 (first 50 chars): ${STATEMENT_BASE64:0:50}..."
+
           echo "Calling CheckRelease API..."
           RESPONSE=$(curl -s -X POST "https://a7fhin8o.us-central1.bytebase.com/v1/projects/murmur/releases:check" \
             -H "Authorization: Bearer ${{ steps.exchange.outputs.access_token }}" \
@@ -69,7 +73,7 @@ jobs:
                   \"path\": \"schema/schema.sql\",
                   \"type\": \"DECLARATIVE\",
                   \"version\": \"1.0.0\",
-                  \"statement\": $(echo "$SCHEMA_CONTENT" | jq -Rs .)
+                  \"statement\": \"$STATEMENT_BASE64\"
                 }]
               },
               \"targets\": [\"instances/local/databases/postgres\"],
@@ -80,7 +84,7 @@ jobs:
           echo "$RESPONSE" | jq .
 
           # Check if there are any results
-          RESULT_COUNT=$(echo "$RESPONSE" | jq '.results | length')
+          RESULT_COUNT=$(echo "$RESPONSE" | jq '.results | length // 0')
           echo ""
           echo "Result count: $RESULT_COUNT"
 
