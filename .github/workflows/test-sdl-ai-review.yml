@@ -45,6 +45,14 @@ jobs:
           echo "access_token=$ACCESS_TOKEN" >> $GITHUB_OUTPUT
           echo "Successfully obtained Bytebase access token!"
 
+      - name: Check AI Setting Status
+        run: |
+          echo "Checking AI setting status..."
+          RESPONSE=$(curl -s "https://a7fhin8o.us-central1.bytebase.com/v1/settings/bb.workspace.ai-assistant" \
+            -H "Authorization: Bearer ${{ steps.exchange.outputs.access_token }}")
+          echo "AI Setting Response:"
+          echo "$RESPONSE" | jq .
+
       - name: Test Check Release with Custom Rules
         run: |
           echo "Reading custom rules from .bytebase/sql-review.md..."
