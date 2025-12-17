@@ -1,0 +1,92 @@
+name: Test SDL AI Review
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:  # Manual trigger
+
+jobs:
+  test-ai-review:
+    runs-on: self-hosted
+
+    permissions:
+      id-token: write   # Required for OIDC token
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Get OIDC Token
+        id: oidc
+        run: |
+          TOKEN=$(curl -s -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
+            "$ACTIONS_ID_TOKEN_REQUEST_URL" | jq -r '.value')
+          echo "oidc_token=$TOKEN" >> $GITHUB_OUTPUT
+          echo "Got OIDC token (first 50 chars): ${TOKEN:0:50}..."
+
+      - name: Exchange for Bytebase Token
+        id: exchange
+        run: |
+          RESPONSE=$(curl -s -X POST "https://a7fhin8o.us-central1.bytebase.com/v1/auth:exchangeToken" \
+            -H "Content-Type: application/json" \
+            -d "{
+              \"email\": \"github_bot@workload.bytebase.com\",
+              \"token\": \"${{ steps.oidc.outputs.oidc_token }}\"
+            }")
+
+          echo "Exchange response: $RESPONSE"
+
+          ACCESS_TOKEN=$(echo $RESPONSE | jq -r '.accessToken')
+          if [ "$ACCESS_TOKEN" == "null" ] || [ -z "$ACCESS_TOKEN" ]; then
+            echo "Failed to get access token"
+            exit 1
+          fi
+          echo "access_token=$ACCESS_TOKEN" >> $GITHUB_OUTPUT
+          echo "Successfully obtained Bytebase access token!"
+
+      - name: Test Check Release with Custom Rules
+        run: |
+          echo "Reading custom rules from .bytebase/sql-review.md..."
+          CUSTOM_RULES=$(cat .bytebase/sql-review.md)
+          echo "Custom rules content:"
+          echo "$CUSTOM_RULES"
+          echo ""
+
+          echo "Reading schema file..."
+          SCHEMA_CONTENT=$(cat schema/schema.sql)
+          echo "Schema content:"
+          echo "$SCHEMA_CONTENT"
+          echo ""
+
+          echo "Calling CheckRelease API..."
+          RESPONSE=$(curl -s -X POST "https://a7fhin8o.us-central1.bytebase.com/v1/projects/murmur/releases:check" \
+            -H "Authorization: Bearer ${{ steps.exchange.outputs.access_token }}" \
+            -H "Content-Type: application/json" \
+            -d "{
+              \"release\": {
+                \"files\": [{
+                  \"path\": \"schema/schema.sql\",
+                  \"type\": \"DECLARATIVE\",
+                  \"version\": \"1.0.0\",
+                  \"statement\": $(echo "$SCHEMA_CONTENT" | jq -Rs .)
+                }]
+              },
+              \"targets\": [\"instances/local/databases/postgres\"],
+              \"customRules\": $(echo "$CUSTOM_RULES" | jq -Rs .)
+            }")
+
+          echo "CheckRelease Response:"
+          echo "$RESPONSE" | jq .
+
+          # Check if there are any results
+          RESULT_COUNT=$(echo "$RESPONSE" | jq '.results | length')
+          echo ""
+          echo "Result count: $RESULT_COUNT"
+
+          if [ "$RESULT_COUNT" -gt 0 ]; then
+            echo "Found $RESULT_COUNT check result(s)"
+            echo "$RESPONSE" | jq '.results[].advices[]?'
+          else
+            echo "No check results returned - AI lint may not be working!"
+          fi
