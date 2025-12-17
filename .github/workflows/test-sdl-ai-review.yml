@@ -7,7 +7,7 @@ on:
 
 jobs:
   test-ai-review:
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
 
     permissions:
       id-token: write   # Required for OIDC token
@@ -28,7 +28,7 @@ jobs:
       - name: Exchange for Bytebase Token
         id: exchange
         run: |
-          RESPONSE=$(curl -s -X POST "https://a7fhin8o.us-central1.bytebase.com/v1/auth:exchangeToken" \
+          RESPONSE=$(curl -s -X POST "http://localhost:8080/v1/auth:exchangeToken" \
             -H "Content-Type: application/json" \
             -d "{
               \"email\": \"github_bot@workload.bytebase.com\",
@@ -45,14 +45,6 @@ jobs:
           echo "access_token=$ACCESS_TOKEN" >> $GITHUB_OUTPUT
           echo "Successfully obtained Bytebase access token!"
 
-      - name: Check AI Setting Status
-        run: |
-          echo "Checking AI setting status..."
-          RESPONSE=$(curl -s "https://a7fhin8o.us-central1.bytebase.com/v1/settings/bb.workspace.ai-assistant" \
-            -H "Authorization: Bearer ${{ steps.exchange.outputs.access_token }}")
-          echo "AI Setting Response:"
-          echo "$RESPONSE" | jq .
-
       - name: Test Check Release with Custom Rules
         run: |
           echo "Reading custom rules from .bytebase/sql-review.md..."
@@ -68,11 +60,11 @@ jobs:
           echo ""
 
           # Encode statement as base64 (proto bytes field requires base64)
-          STATEMENT_BASE64=$(echo -n "$SCHEMA_CONTENT" | base64 -w 0)
+          STATEMENT_BASE64=$(echo -n "$SCHEMA_CONTENT" | base64)
           echo "Statement base64 (first 50 chars): ${STATEMENT_BASE64:0:50}..."
 
-          echo "Calling CheckRelease API..."
-          RESPONSE=$(curl -s -X POST "https://a7fhin8o.us-central1.bytebase.com/v1/projects/murmur/releases:check" \
+          echo "Calling CheckRelease API on local Bytebase..."
+          RESPONSE=$(curl -s -X POST "http://localhost:8080/v1/projects/aowuaowu/releases:check" \
             -H "Authorization: Bearer ${{ steps.exchange.outputs.access_token }}" \
             -H "Content-Type: application/json" \
             -d "{
@@ -84,7 +76,7 @@ jobs:
                   \"statement\": \"$STATEMENT_BASE64\"
                 }]
               },
-              \"targets\": [\"instances/local/databases/postgres\"],
+              \"targets\": [\"instances/pg-docker/databases/db1\"],
               \"customRules\": $(echo "$CUSTOM_RULES" | jq -Rs .)
             }")
 
@@ -98,7 +90,9 @@ jobs:
 
           if [ "$RESULT_COUNT" -gt 0 ]; then
             echo "Found $RESULT_COUNT check result(s)"
+            echo "All advices:"
             echo "$RESPONSE" | jq '.results[].advices[]?'
           else
             echo "No check results returned - AI lint may not be working!"
+            echo "Check Bytebase logs for details"
           fi
