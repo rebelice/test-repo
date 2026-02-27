@@ -47,62 +47,21 @@ jobs:
           echo "access_token=$ACCESS_TOKEN" >> $GITHUB_OUTPUT
           echo "Successfully obtained Bytebase access token"
 
-      - name: Check DDL Executability
+      - name: Bytebase DDL Check
         run: |
-          # Build release files JSON from migrations
-          FILES="[]"
-          for f in $(ls migrations/*.sql 2>/dev/null | sort); do
-            FILENAME=$(basename "$f")
-            # Extract version: v1__xxx.sql -> 1
-            VERSION=$(echo "$FILENAME" | sed -E 's/^[vV]?([0-9]+(\.[0-9]+)*).*/\1/')
-            CONTENT=$(cat "$f")
-            STATEMENT_BASE64=$(echo -n "$CONTENT" | base64)
+          /Users/rebeliceyang/Github/bytebase/bytebase-action check \
+            --url http://localhost:8080 \
+            --access-token ${{ steps.exchange.outputs.access_token }} \
+            --project projects/aowuaowu \
+            --targets instances/pg-docker/databases/db1 \
+            --file-pattern "migrations/*.sql" \
+            --check-release FAIL_ON_ERROR \
+            --output results.json
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-            FILES=$(echo "$FILES" | jq \
-              --arg path "$f" \
-              --arg version "$VERSION" \
-              --arg stmt "$STATEMENT_BASE64" \
-              '. + [{
-                "path": $path,
-                "version": $version,
-                "statement": $stmt
-              }]')
-          done
-
-          echo "=== Release files ==="
-          echo "$FILES" | jq '.[].path'
-
-          echo ""
-          echo "=== Calling CheckRelease API ==="
-          RESPONSE=$(curl -s -X POST "http://localhost:8080/v1/projects/aowuaowu/releases:check" \
-            -H "Authorization: Bearer ${{ steps.exchange.outputs.access_token }}" \
-            -H "Content-Type: application/json" \
-            -d "{
-              \"release\": {
-                \"type\": \"VERSIONED\",
-                \"files\": $FILES
-              },
-              \"targets\": [\"instances/pg-docker/databases/db1\"]
-            }")
-
-          echo ""
-          echo "=== CheckRelease Response ==="
-          echo "$RESPONSE" | jq .
-
-          # Check for errors
-          ERROR_COUNT=$(echo "$RESPONSE" | jq '[.results[]?.advices[]? | select(.status == "ERROR")] | length')
-          WARNING_COUNT=$(echo "$RESPONSE" | jq '[.results[]?.advices[]? | select(.status == "WARNING")] | length')
-
-          echo ""
-          echo "=== Summary ==="
-          echo "Errors: $ERROR_COUNT"
-          echo "Warnings: $WARNING_COUNT"
-
-          if [ "$ERROR_COUNT" -gt 0 ]; then
-            echo ""
-            echo "=== Error Details ==="
-            echo "$RESPONSE" | jq '.results[] | select(.advices[]?.status == "ERROR") | {file, target, advices: [.advices[] | select(.status == "ERROR")]}'
-            echo ""
-            echo "DDL executability check found errors!"
-            exit 1
-          fi
+      - name: Show Results
+        if: always()
+        run: |
+          echo "=== Check Results ==="
+          cat results.json 2>/dev/null | jq . || echo "No results file"
