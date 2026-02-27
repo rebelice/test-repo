@@ -1,0 +1,108 @@
+name: Test pgddl DDL Executability Check
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'migrations/**'
+  pull_request:
+    paths:
+      - 'migrations/**'
+  workflow_dispatch:
+
+jobs:
+  check:
+    runs-on: self-hosted
+
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Get OIDC Token
+        id: oidc
+        run: |
+          TOKEN=$(curl -s -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
+            "$ACTIONS_ID_TOKEN_REQUEST_URL" | jq -r '.value')
+          echo "oidc_token=$TOKEN" >> $GITHUB_OUTPUT
+
+      - name: Exchange for Bytebase Token
+        id: exchange
+        run: |
+          RESPONSE=$(curl -s -X POST "http://localhost:8080/v1/auth:exchangeToken" \
+            -H "Content-Type: application/json" \
+            -d "{
+              \"email\": \"github_bot@workload.bytebase.com\",
+              \"token\": \"${{ steps.oidc.outputs.oidc_token }}\"
+            }")
+          ACCESS_TOKEN=$(echo $RESPONSE | jq -r '.accessToken')
+          if [ "$ACCESS_TOKEN" == "null" ] || [ -z "$ACCESS_TOKEN" ]; then
+            echo "Failed to get access token"
+            echo "Response: $RESPONSE"
+            exit 1
+          fi
+          echo "access_token=$ACCESS_TOKEN" >> $GITHUB_OUTPUT
+          echo "Successfully obtained Bytebase access token"
+
+      - name: Check DDL Executability
+        run: |
+          # Build release files JSON from migrations
+          FILES="[]"
+          for f in $(ls migrations/*.sql 2>/dev/null | sort); do
+            FILENAME=$(basename "$f")
+            # Extract version: v1__xxx.sql -> 1
+            VERSION=$(echo "$FILENAME" | sed -E 's/^[vV]?([0-9]+(\.[0-9]+)*).*/\1/')
+            CONTENT=$(cat "$f")
+            STATEMENT_BASE64=$(echo -n "$CONTENT" | base64)
+
+            FILES=$(echo "$FILES" | jq \
+              --arg path "$f" \
+              --arg version "$VERSION" \
+              --arg stmt "$STATEMENT_BASE64" \
+              '. + [{
+                "path": $path,
+                "version": $version,
+                "statement": $stmt
+              }]')
+          done
+
+          echo "=== Release files ==="
+          echo "$FILES" | jq '.[].path'
+
+          echo ""
+          echo "=== Calling CheckRelease API ==="
+          RESPONSE=$(curl -s -X POST "http://localhost:8080/v1/projects/aowuaowu/releases:check" \
+            -H "Authorization: Bearer ${{ steps.exchange.outputs.access_token }}" \
+            -H "Content-Type: application/json" \
+            -d "{
+              \"release\": {
+                \"type\": \"VERSIONED\",
+                \"files\": $FILES
+              },
+              \"targets\": [\"instances/pg-docker/databases/db1\"]
+            }")
+
+          echo ""
+          echo "=== CheckRelease Response ==="
+          echo "$RESPONSE" | jq .
+
+          # Check for errors
+          ERROR_COUNT=$(echo "$RESPONSE" | jq '[.results[]?.advices[]? | select(.status == "ERROR")] | length')
+          WARNING_COUNT=$(echo "$RESPONSE" | jq '[.results[]?.advices[]? | select(.status == "WARNING")] | length')
+
+          echo ""
+          echo "=== Summary ==="
+          echo "Errors: $ERROR_COUNT"
+          echo "Warnings: $WARNING_COUNT"
+
+          if [ "$ERROR_COUNT" -gt 0 ]; then
+            echo ""
+            echo "=== Error Details ==="
+            echo "$RESPONSE" | jq '.results[] | select(.advices[]?.status == "ERROR") | {file, target, advices: [.advices[] | select(.status == "ERROR")]}'
+            echo ""
+            echo "DDL executability check found errors!"
+            exit 1
+          fi
