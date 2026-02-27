@@ -1,0 +1,6 @@
+CREATE TABLE users (
+    id SERIAL PRIMARY KEY,
+    name TEXT NOT NULL
+);
+
+ALTER TABLE users ADD COLUMN email TEXT NOT NULL;
