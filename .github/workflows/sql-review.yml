@@ -10,7 +10,7 @@ jobs:
       pull-requests: write
     runs-on: [self-hosted, macOS]
     env:
-      BYTEBASE_URL: https://zp.bytebase.com
+      BYTEBASE_URL: http://localhost:8080
       BYTEBASE_WORKLOAD_IDENTITY: abcdefg@aowuaowu.workload.bytebase.com
     steps:
       - uses: actions/checkout@v4
