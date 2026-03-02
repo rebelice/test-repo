@@ -8,9 +8,7 @@ jobs:
     permissions:
       id-token: write
       pull-requests: write
-    runs-on: [self-hosted, Linux]
-    container:
-      image: bytebase/bytebase-action
+    runs-on: [self-hosted, macOS]
     env:
       BYTEBASE_URL: https://zp.bytebase.com
       BYTEBASE_WORKLOAD_IDENTITY: abcdefg@aowuaowu.workload.bytebase.com
@@ -30,7 +28,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          bytebase-action check \
+          ~/bin/bytebase-action check \
             --url=$BYTEBASE_URL \
             --access-token=${{ steps.bytebase-auth.outputs.access-token }} \
             --project=projects/aowuaowu \
