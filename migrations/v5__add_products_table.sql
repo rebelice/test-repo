@@ -1,10 +1,10 @@
 CREATE TABLE products (
-    id INTEGER,
-    name VARCHAR(255),
-    price FLOAT,
-    description TEXT NOT NULL DEFAULT ''
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(255) NOT NULL
 );
 
-ALTER TABLE orders ADD COLUMN discount FLOAT;
-
-DROP TABLE IF EXISTS users;
+CREATE TABLE products (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(255) NOT NULL,
+    price DECIMAL(10, 2) NOT NULL
+);
