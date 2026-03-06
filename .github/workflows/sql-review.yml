@@ -8,9 +8,11 @@ jobs:
     permissions:
       id-token: write
       pull-requests: write
-    runs-on: [self-hosted, macOS]
+    runs-on: ubuntu-latest
+    container:
+      image: bytebase/bytebase-action:ksl
     env:
-      BYTEBASE_URL: http://localhost:8080
+      BYTEBASE_URL: https://c20c-158-247-252-232.ngrok-free.app
       BYTEBASE_WORKLOAD_IDENTITY: github-bot@aowuaowu.workload.bytebase.com
     steps:
       - uses: actions/checkout@v4
@@ -28,7 +30,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          ~/bin/bytebase-action check \
+          bytebase-action check \
             --url=$BYTEBASE_URL \
             --access-token=${{ steps.bytebase-auth.outputs.access-token }} \
             --project=projects/aowuaowu \

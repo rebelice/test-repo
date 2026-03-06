@@ -4,12 +4,12 @@ on:
     branches: ["main"]
     paths: ["migrations/*.sql"]
 env:
-  BYTEBASE_URL: http://localhost:8080
+  BYTEBASE_URL: https://c20c-158-247-252-232.ngrok-free.app
   BYTEBASE_WORKLOAD_IDENTITY: github-bot@aowuaowu.workload.bytebase.com
   BYTEBASE_PROJECT: projects/aowuaowu
 jobs:
   build:
-    runs-on: [self-hosted, macOS]
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - name: Build
@@ -18,7 +18,9 @@ jobs:
     needs: build
     permissions:
       id-token: write
-    runs-on: [self-hosted, macOS]
+    runs-on: ubuntu-latest
+    container:
+      image: bytebase/bytebase-action:ksl
     outputs:
       bytebase-plan: ${{ steps.set-output.outputs.plan }}
     steps:
@@ -35,7 +37,7 @@ jobs:
           echo "access-token=$ACCESS_TOKEN" >> $GITHUB_OUTPUT
       - name: Create rollout
         run: |
-          ~/bin/bytebase-action rollout \
+          bytebase-action rollout \
             --url=$BYTEBASE_URL \
             --access-token=${{ steps.bytebase-auth.outputs.access-token }} \
             --project=$BYTEBASE_PROJECT \
@@ -51,8 +53,10 @@ jobs:
     needs: create-rollout
     permissions:
       id-token: write
-    runs-on: [self-hosted, macOS]
+    runs-on: ubuntu-latest
     environment: test
+    container:
+      image: bytebase/bytebase-action:ksl
     steps:
       - uses: actions/checkout@v4
       - name: Exchange token
@@ -67,7 +71,7 @@ jobs:
           echo "access-token=$ACCESS_TOKEN" >> $GITHUB_OUTPUT
       - name: Deploy to test
         run: |
-          ~/bin/bytebase-action rollout \
+          bytebase-action rollout \
             --url=$BYTEBASE_URL \
             --access-token=${{ steps.bytebase-auth.outputs.access-token }} \
             --project=$BYTEBASE_PROJECT \
@@ -77,8 +81,10 @@ jobs:
     needs: [deploy-to-test, create-rollout]
     permissions:
       id-token: write
-    runs-on: [self-hosted, macOS]
+    runs-on: ubuntu-latest
     environment: prod
+    container:
+      image: bytebase/bytebase-action:ksl
     steps:
       - uses: actions/checkout@v4
       - name: Exchange token
@@ -93,7 +99,7 @@ jobs:
           echo "access-token=$ACCESS_TOKEN" >> $GITHUB_OUTPUT
       - name: Deploy to prod
         run: |
-          ~/bin/bytebase-action rollout \
+          bytebase-action rollout \
             --url=$BYTEBASE_URL \
             --access-token=${{ steps.bytebase-auth.outputs.access-token }} \
             --project=$BYTEBASE_PROJECT \
