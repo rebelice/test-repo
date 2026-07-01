@@ -19,5 +19,3 @@ CREATE TABLE reviews (
     review_text TEXT,
     created_at TIMESTAMP DEFAULT NOW()
 );
-
-ALTER TABLE orders ALTER COLUMN status SET DATA TYPE TEXT;
