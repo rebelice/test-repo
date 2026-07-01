@@ -21,7 +21,7 @@ jobs:
       - uses: ariga/atlas-action/migrate/lint@v1
         with:
           dir: 'file://migrations'
-          dir-name: 'test-repo-v2'
+          dir-name: 'test-repo-v3'
           dev-url: 'docker://postgres/16/dev?search_path=public'
           config: 'file://atlas.hcl'
           env: 'ci'
