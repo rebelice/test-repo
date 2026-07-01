@@ -27,6 +27,6 @@ jobs:
             --base "atlas://test-repo-v3?tag=latest" \
             --dev-url "docker://postgres/16/dev?search_path=public" \
             --git-base "origin/main" \
-            --format '{{ json . }}'
+            -w
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
