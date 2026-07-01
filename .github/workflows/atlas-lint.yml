@@ -27,5 +27,6 @@ jobs:
           dev-url: 'docker://postgres/16/dev?search_path=public'
           config: 'file://atlas.hcl'
           env: 'ci'
+          git-base: 'origin/main'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
