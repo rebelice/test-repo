@@ -18,6 +18,8 @@ jobs:
       - uses: ariga/setup-atlas@v0
         with:
           cloud-token: ${{ secrets.ATLAS_TOKEN }}
+      - name: Generate migration checksum
+        run: atlas migrate hash --dir "file://migrations"
       - name: Push migration directory to Atlas Cloud
         run: |
           atlas migrate push test-repo \
