@@ -17,12 +17,11 @@ jobs:
           fetch-depth: 0
       - uses: ariga/setup-atlas@v0
         with:
-          version: v0.37.0
-      - name: Run Atlas Migrate Lint
-        run: |
-          atlas migrate lint \
-            --dev-url "docker://postgres/16/dev?search_path=public" \
-            --dir "file://migrations" \
-            --git-base "origin/main"
+          cloud-token: ${{ secrets.ATLAS_TOKEN }}
+      - uses: ariga/atlas-action/migrate/lint@v1
+        with:
+          dir: 'file://migrations'
+          dir-name: 'test-repo'
+          dev-url: 'docker://postgres/16/dev?search_path=public'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
