@@ -1,0 +1,25 @@
+name: Atlas Migrate Lint
+on:
+  pull_request:
+    paths:
+      - 'migrations/**'
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: ariga/setup-atlas@v0
+      - uses: ariga/atlas-action/migrate/lint@v1
+        with:
+          dir: 'file://migrations'
+          dir-format: flyway
+          dev-url: 'docker://postgres/16/dev?search_path=public'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
