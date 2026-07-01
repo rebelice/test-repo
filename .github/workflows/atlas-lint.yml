@@ -26,5 +26,7 @@ jobs:
           dir-name: 'test-repo-v3'
           dev-url: 'docker://postgres/16/dev?search_path=public'
           git-base: 'origin/main'
+          config: 'file://atlas.hcl'
+          env: 'ci'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

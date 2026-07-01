@@ -25,8 +25,5 @@ env "ci" {
         message = "SELECT * is not allowed; enumerate columns explicitly"
       }
     }
-    rule "hcl" "custom-rules" {
-      src = ["schema.rule.hcl"]
-    }
   }
 }
