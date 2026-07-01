@@ -20,8 +20,6 @@ jobs:
           cloud-token: ${{ secrets.ATLAS_TOKEN }}
       - name: Generate migration checksum
         run: atlas migrate hash --env ci
-      - name: Push migration directory to Atlas Cloud
-        run: atlas migrate push test-repo --env ci
       - uses: ariga/atlas-action/migrate/lint@v1
         with:
           dir: 'file://migrations'

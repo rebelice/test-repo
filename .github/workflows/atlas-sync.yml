@@ -1,0 +1,20 @@
+name: Atlas Migrate Push
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'migrations/**'
+
+jobs:
+  push:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ariga/setup-atlas@v0
+        with:
+          cloud-token: ${{ secrets.ATLAS_TOKEN }}
+      - name: Generate migration checksum
+        run: atlas migrate hash --env ci
+      - name: Push migrations to Atlas Cloud
+        run: atlas migrate push test-repo --env ci
