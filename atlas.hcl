@@ -2,7 +2,8 @@ env "ci" {
   dev = "docker://postgres/16/dev?search_path=public"
 
   migration {
-    dir = "file://migrations"
+    dir      = "file://migrations"
+    dir_name = "test-repo-v3"
   }
 
   lint {

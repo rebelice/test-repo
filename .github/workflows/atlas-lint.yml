@@ -23,9 +23,7 @@ jobs:
       - name: Run Atlas Migrate Lint
         run: |
           atlas migrate lint \
-            --dir "file://migrations" \
-            --dir-name "test-repo-v3" \
-            --dev-url "docker://postgres/16/dev?search_path=public" \
+            --env ci \
             --git-base "origin/main" \
             --web
         env:
