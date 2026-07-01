@@ -20,81 +20,13 @@ jobs:
           cloud-token: ${{ secrets.ATLAS_TOKEN }}
       - name: Generate migration checksum
         run: atlas migrate hash --env ci
-      - name: Run Atlas Migrate Lint
-        id: lint
-        continue-on-error: true
-        run: |
-          atlas migrate lint \
-            --env ci \
-            --base "atlas://test-repo-v3?tag=latest" \
-            --git-base "origin/main" \
-            --format '{{ json . }}' > lint-result.json 2>&1
-          echo "exit_code=$?" >> $GITHUB_OUTPUT
+      - uses: ariga/atlas-action/migrate/lint@v1
+        with:
+          dir: 'file://migrations'
+          dir-name: 'test-repo-v3'
+          dev-url: 'docker://postgres/16/dev?search_path=public'
+          git-base: 'origin/main'
+          config: 'file://atlas.hcl'
+          env: 'ci'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - name: Post lint results to PR
-        if: always()
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const fs = require('fs');
-            let body = '## Atlas Migrate Lint Report\n\n';
-            try {
-              const raw = fs.readFileSync('lint-result.json', 'utf8').trim();
-              const data = JSON.parse(raw);
-              const files = data.Files || [];
-              if (files.length === 0) {
-                body += '✅ No issues found.\n';
-              } else {
-                let hasErrors = false;
-                for (const file of files) {
-                  body += `### 📄 \`${file.Name}\`\n\n`;
-                  for (const report of (file.Reports || [])) {
-                    body += `**${report.Text}**\n\n`;
-                    for (const diag of (report.Diagnostics || [])) {
-                      const icon = diag.Code.startsWith('DS') ? '🔴' : '⚠️';
-                      if (diag.Code.startsWith('DS')) hasErrors = true;
-                      body += `- ${icon} **[${diag.Code}]** ${diag.Text}\n`;
-                      for (const fix of (diag.SuggestedFixes || [])) {
-                        if (fix.Message) body += `  - 💡 ${fix.Message}\n`;
-                      }
-                    }
-                    body += '\n';
-                  }
-                }
-                if (hasErrors) {
-                  body += '---\n❌ **Destructive changes detected.** Please review before merging.\n';
-                }
-              }
-            } catch (e) {
-              const raw = fs.existsSync('lint-result.json')
-                ? fs.readFileSync('lint-result.json', 'utf8')
-                : 'No output file found';
-              body += `⚠️ Failed to parse lint output:\n\`\`\`\n${raw}\n\`\`\`\n`;
-            }
-            const { data: comments } = await github.rest.issues.listComments({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              issue_number: context.issue.number,
-            });
-            const existing = comments.find(c =>
-              c.user.type === 'Bot' && c.body.includes('Atlas Migrate Lint Report')
-            );
-            if (existing) {
-              await github.rest.issues.updateComment({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                comment_id: existing.id,
-                body,
-              });
-            } else {
-              await github.rest.issues.createComment({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                issue_number: context.issue.number,
-                body,
-              });
-            }
-      - name: Fail if lint found issues
-        if: steps.lint.outcome == 'failure'
-        run: exit 1
