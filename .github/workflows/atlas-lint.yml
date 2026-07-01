@@ -18,6 +18,11 @@ jobs:
       - uses: ariga/setup-atlas@v0
         with:
           cloud-token: ${{ secrets.ATLAS_TOKEN }}
+      - name: Push migration directory to Atlas Cloud
+        run: |
+          atlas migrate push test-repo \
+            --dev-url "docker://postgres/16/dev?search_path=public" \
+            --dir "file://migrations"
       - uses: ariga/atlas-action/migrate/lint@v1
         with:
           dir: 'file://migrations'
