@@ -19,16 +19,15 @@ jobs:
         with:
           cloud-token: ${{ secrets.ATLAS_TOKEN }}
       - name: Generate migration checksum
-        run: atlas migrate hash --dir "file://migrations"
+        run: atlas migrate hash --env ci
       - name: Push migration directory to Atlas Cloud
-        run: |
-          atlas migrate push test-repo \
-            --dev-url "docker://postgres/16/dev?search_path=public" \
-            --dir "file://migrations"
+        run: atlas migrate push test-repo --env ci
       - uses: ariga/atlas-action/migrate/lint@v1
         with:
           dir: 'file://migrations'
           dir-name: 'test-repo'
           dev-url: 'docker://postgres/16/dev?search_path=public'
+          config: 'file://atlas.hcl'
+          env: 'ci'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
