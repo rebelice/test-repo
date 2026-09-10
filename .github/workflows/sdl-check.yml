@@ -28,6 +28,8 @@ jobs:
           echo "::add-mask::$ACCESS_TOKEN"
           echo "access-token=$ACCESS_TOKEN" >> $GITHUB_OUTPUT
       - name: Declarative check
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           bytebase-action check \
             --url=$BYTEBASE_URL \
@@ -39,4 +41,4 @@ jobs:
             --check-release=SKIP \
             --output=$RUNNER_TEMP/sdl-check.json || true
           echo "--- advices ---"
-          jq '.checkResults.results[] | {file, riskLevel, advices: [.advices[]? | {status, title, content: (.content | .[0:200])}]}' $RUNNER_TEMP/sdl-check.json
+          cat $RUNNER_TEMP/sdl-check.json | head -c 8000
