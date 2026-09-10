@@ -1,0 +1,39 @@
+name: Bytebase Probe
+on:
+  workflow_dispatch:
+env:
+  BYTEBASE_URL: https://cloud.bytebase.com
+  BYTEBASE_WORKLOAD_IDENTITY: github@gitops-dvmo.workload.bytebase.com
+jobs:
+  probe:
+    permissions:
+      id-token: write
+      contents: read
+    runs-on: ubuntu-latest
+    steps:
+      - name: Exchange token
+        id: bytebase-auth
+        run: |
+          OIDC_TOKEN=$(curl -s -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
+            "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=bytebase" | jq -r '.value')
+          echo "OIDC claims:"; echo "$OIDC_TOKEN" | cut -d. -f2 | base64 -d 2>/dev/null | jq '{iss,aud,sub,repository,ref}'
+          RESPONSE=$(curl -s -w '\nHTTP %{http_code}' -X POST "$BYTEBASE_URL/v1/auth:exchangeToken" \
+            -H "Content-Type: application/json" \
+            -d "{\"token\":\"$OIDC_TOKEN\",\"email\":\"$BYTEBASE_WORKLOAD_IDENTITY\"}")
+          echo "exchange status: $(echo "$RESPONSE" | tail -1)"
+          ACCESS_TOKEN=$(echo "$RESPONSE" | head -1 | jq -r '.accessToken // empty')
+          if [ -z "$ACCESS_TOKEN" ]; then echo "exchange failed:"; echo "$RESPONSE" | head -1; exit 1; fi
+          echo "::add-mask::$ACCESS_TOKEN"
+          echo "access-token=$ACCESS_TOKEN" >> $GITHUB_OUTPUT
+      - name: Probe resources
+        env:
+          TOKEN: ${{ steps.bytebase-auth.outputs.access-token }}
+        run: |
+          get() { echo "### GET $1"; curl -s -w '\nHTTP %{http_code}\n' -H "Authorization: Bearer $TOKEN" "$BYTEBASE_URL$1" | head -c 6000; echo; }
+          get /v1/actuator/info
+          get /v1/projects/gitops-dvmo
+          get /v1/projects/gitops-dvmo/databases
+          get /v1/instances/supabase-ji8m
+          get /v1/projects/gitops-dvmo/instances/supabase-ji8m
+          get /v1/projects/gitops-dvmo/instances/supabase-ji8m/databases
+          get /v1/settings/bb.workspace.environment
