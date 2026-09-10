@@ -7,13 +7,16 @@ jobs:
   sql-review:
     permissions:
       id-token: write
+      contents: read
       pull-requests: write
     runs-on: ubuntu-latest
     container:
-      image: bytebase/bytebase-action:ksl
+      image: bytebase/bytebase-action:cloud
     env:
-      BYTEBASE_URL: https://c20c-158-247-252-232.ngrok-free.app
-      BYTEBASE_WORKLOAD_IDENTITY: github-bot@aowuaowu.workload.bytebase.com
+      BYTEBASE_URL: https://cloud.bytebase.com
+      BYTEBASE_WORKLOAD_IDENTITY: github@gitops-dvmo.workload.bytebase.com
+      BYTEBASE_PROJECT: projects/gitops-dvmo
+      BYTEBASE_TARGETS: projects/gitops-dvmo/instances/supabase-ji8m/databases/postgres
     steps:
       - uses: actions/checkout@v4
       - name: Exchange token
@@ -25,6 +28,7 @@ jobs:
             -H "Content-Type: application/json" \
             -d "{\"token\":\"$OIDC_TOKEN\",\"email\":\"$BYTEBASE_WORKLOAD_IDENTITY\"}" \
             | jq -r '.accessToken')
+          echo "::add-mask::$ACCESS_TOKEN"
           echo "access-token=$ACCESS_TOKEN" >> $GITHUB_OUTPUT
       - name: SQL Review
         env:
@@ -33,6 +37,10 @@ jobs:
           bytebase-action check \
             --url=$BYTEBASE_URL \
             --access-token=${{ steps.bytebase-auth.outputs.access-token }} \
-            --project=projects/aowuaowu \
-            --targets=instances/pg-docker/databases/db01 \
-            --file-pattern=migrations/*.sql
+            --project=$BYTEBASE_PROJECT \
+            --targets=$BYTEBASE_TARGETS \
+            --file-pattern=migrations/*.sql \
+            --check-release=FAIL_ON_ERROR \
+            --output=$RUNNER_TEMP/bytebase-check.json
+          echo "--- check output ---"
+          cat $RUNNER_TEMP/bytebase-check.json
