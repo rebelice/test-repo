@@ -4,7 +4,6 @@ CREATE TABLE public.todos (
     title text NOT NULL,
     is_done boolean NOT NULL DEFAULT false,
     created_at timestamptz NOT NULL DEFAULT now(),
-    due_date date,
     CONSTRAINT pk_todos PRIMARY KEY (id)
 );
 
