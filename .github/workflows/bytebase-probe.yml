@@ -1,6 +1,10 @@
 name: Bytebase Probe
 on:
   workflow_dispatch:
+    inputs:
+      plan:
+        description: plan id to inspect
+        default: "101"
 env:
   BYTEBASE_URL: https://cloud.bytebase.com
   BYTEBASE_WORKLOAD_IDENTITY: github@gitops-dvmo.workload.bytebase.com
@@ -28,6 +32,7 @@ jobs:
       - name: Probe resources
         env:
           TOKEN: ${{ steps.bytebase-auth.outputs.access-token }}
+          PLAN: ${{ inputs.plan }}
         run: |
           get() { echo "### GET $1"; curl -s -w '\nHTTP %{http_code}\n' -H "Authorization: Bearer $TOKEN" "$BYTEBASE_URL$1" | head -c 6000; echo; }
           get /v1/actuator/info
@@ -36,4 +41,9 @@ jobs:
           get /v1/instances/supabase-ji8m
           get /v1/projects/gitops-dvmo/instances/supabase-ji8m
           get /v1/projects/gitops-dvmo/instances/supabase-ji8m/databases
-          get /v1/settings/bb.workspace.environment
+          echo "### task runs of plan ${PLAN:-101}"
+          ROLLOUT=$(curl -s -H "Authorization: Bearer $TOKEN" "$BYTEBASE_URL/v1/projects/gitops-dvmo/plans/${PLAN:-101}/rollout")
+          for TASK in $(echo "$ROLLOUT" | jq -r '.stages[].tasks[].name'); do
+            echo "## $TASK"
+            curl -s -H "Authorization: Bearer $TOKEN" "$BYTEBASE_URL/v1/$TASK/taskRuns" | jq '.taskRuns[] | {name, status, startTime, updateTime, detail, schedulerInfo}'
+          done
