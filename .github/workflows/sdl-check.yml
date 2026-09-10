@@ -1,0 +1,42 @@
+name: SDL Check (declarative, check only)
+on:
+  workflow_dispatch:
+env:
+  BYTEBASE_URL: https://cloud.bytebase.com
+  BYTEBASE_WORKLOAD_IDENTITY: github@gitops-dvmo.workload.bytebase.com
+  BYTEBASE_PROJECT: projects/gitops-dvmo
+  BYTEBASE_TARGETS: projects/gitops-dvmo/instances/supabase-ji8m/databases/postgres
+jobs:
+  sdl-check:
+    permissions:
+      id-token: write
+      contents: read
+    runs-on: ubuntu-latest
+    container:
+      image: bytebase/bytebase-action:cloud
+    steps:
+      - uses: actions/checkout@v4
+      - name: Exchange token
+        id: bytebase-auth
+        run: |
+          OIDC_TOKEN=$(curl -s -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
+            "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=bytebase" | jq -r '.value')
+          ACCESS_TOKEN=$(curl -s -X POST "$BYTEBASE_URL/v1/auth:exchangeToken" \
+            -H "Content-Type: application/json" \
+            -d "{\"token\":\"$OIDC_TOKEN\",\"email\":\"$BYTEBASE_WORKLOAD_IDENTITY\"}" \
+            | jq -r '.accessToken')
+          echo "::add-mask::$ACCESS_TOKEN"
+          echo "access-token=$ACCESS_TOKEN" >> $GITHUB_OUTPUT
+      - name: Declarative check
+        run: |
+          bytebase-action check \
+            --url=$BYTEBASE_URL \
+            --access-token=${{ steps.bytebase-auth.outputs.access-token }} \
+            --project=$BYTEBASE_PROJECT \
+            --targets=$BYTEBASE_TARGETS \
+            --declarative \
+            --file-pattern=sdl/*.sql \
+            --check-release=SKIP \
+            --output=$RUNNER_TEMP/sdl-check.json || true
+          echo "--- advices ---"
+          jq '.checkResults.results[] | {file, riskLevel, advices: [.advices[]? | {status, title, content: (.content | .[0:200])}]}' $RUNNER_TEMP/sdl-check.json
